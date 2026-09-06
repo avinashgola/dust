@@ -1095,10 +1095,7 @@ export class SpaceResource extends BaseResource<SpaceModel> {
    * knows about members clears the groups, and the other way around, which is what switching a
    * space from one to the other has always done.
    *
-   * The two used to be exclusive, selected by `managementMode`: a space's members were either its
-   * manual list or the members of its groups. They are now merged, and a space's members are its
-   * manual list plus the members of every group attached to it. `managementMode` is still accepted
-   * (and ignored) so that clients sending it are not broken.
+   * A space's members are its manual member list plus the members of every group attached to it.
    */
   async updatePermissions(
     auth: Authenticator,
@@ -1244,18 +1241,6 @@ export class SpaceResource extends BaseResource<SpaceModel> {
           "Pods must have at least one editor."
         );
       }
-
-      // `managementMode` no longer drives anything: it is kept up to date only so that clients
-      // that still read it see something coherent, and goes away with the field.
-      await this.update(
-        {
-          managementMode:
-            memberGroups.length > 0 || editorGroups.length > 0
-              ? "group"
-              : "manual",
-        },
-        t
-      );
 
       // Write the updated group associations into group_permissions
       await syncGroupPermissions();
@@ -2464,39 +2449,6 @@ export class SpaceResource extends BaseResource<SpaceModel> {
   // Serialization.
 
   /**
-   * Ends all active memberships of the space's own groups when switching to group management
-   * mode. The manual member list is dropped rather than kept suspended, so switching back to
-   * manual mode starts from an empty list instead of silently restoring access.
-   */
-  private async endManualGroupMembers(
-    auth: Authenticator,
-    transaction?: Transaction
-  ): Promise<void> {
-    const groups = await this.fetchRegularAutoGroups(auth, transaction);
-
-    for (const group of groups) {
-      await group.dangerouslyEndAllMemberships(auth, { transaction });
-    }
-  }
-
-  /**
-   * Restores all suspended members of the default group when switching to manual management mode.
-   *
-   * Transitional: only memberships suspended by the previous behaviour are left to restore (see
-   * `GroupResource.dangerouslyRestoreMembers`); the switch to group mode now ends memberships.
-   */
-  private async restoreManualGroupMembers(
-    auth: Authenticator,
-    transaction?: Transaction
-  ): Promise<void> {
-    const groups = await this.fetchRegularAutoGroups(auth, transaction);
-
-    for (const group of groups) {
-      await group.dangerouslyRestoreMembers(auth, { transaction });
-    }
-  }
-
-  /**
    * Fetches group memberships for this space's regular and editor groups
    * @param auth - Authenticator for workspace context
    * @param shouldIncludeAllMembers - If true, includes all members (active and revoked); if false, only active members
@@ -2664,7 +2616,6 @@ export class SpaceResource extends BaseResource<SpaceModel> {
     return {
       createdAt: this.createdAt.getTime(),
       kind: this.kind,
-      managementMode: this.managementMode,
       name: this.name,
       sId: this.sId,
       updatedAt: this.updatedAt.getTime(),

@@ -32,6 +32,11 @@ import {
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+// Shown in both access states: a space's members are the two lists below put together, and the
+// tabs only show one of them at a time.
+const MEMBERSHIP_SOURCES_DESCRIPTION =
+  "Members are the people picked below, plus everyone in the groups given access to the space.";
+
 interface CreateOrEditSpaceModalProps {
   defaultRestricted?: boolean;
   isAdmin: boolean;
@@ -329,6 +334,7 @@ export function CreateOrEditSpaceModal({
                         Members can read the content of the space and write data
                         into it (upload files, delete documents...).
                       </span>
+                      <span>{MEMBERSHIP_SOURCES_DESCRIPTION}</span>
                     </>
                   }
                   unrestrictedDescription={
@@ -344,6 +350,7 @@ export function CreateOrEditSpaceModal({
                         Members of the space can also write data (upload files,
                         delete documents...).
                       </span>
+                      <span>{MEMBERSHIP_SOURCES_DESCRIPTION}</span>
                     </>
                   }
                 />
