@@ -131,7 +131,7 @@ export const getConfig = ({ env }: { env: Environment }) => {
       }),
       new webpack.DefinePlugin({
         // Expose VITE_* vars on `import.meta.env` so the shared `front`
-        // RegionContext can resolve the regional API base URL in the webpack
+        // CellProvider can resolve the cell API base URL in the webpack
         // build (Vite only injects these in the SPA).
         "import.meta.env": JSON.stringify(
           getImportMetaEnv(
