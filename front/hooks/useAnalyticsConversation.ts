@@ -3,13 +3,18 @@ import { useConversations } from "@app/hooks/conversations/useConversations";
 import { useCreateConversationWithMessage } from "@app/hooks/useCreateConversationWithMessage";
 import { useSendNotification } from "@app/hooks/useNotification";
 import type { DustError } from "@app/lib/error";
-import type { ConversationType } from "@app/types/assistant/conversation";
+import type {
+  ConversationListItemType,
+  ConversationType,
+} from "@app/types/assistant/conversation";
 import type { RichMention } from "@app/types/assistant/mentions";
 import type { ContentFragmentsType } from "@app/types/content_fragment";
 import type { Result } from "@app/types/shared/result";
 import { Err, Ok } from "@app/types/shared/result";
 import type { UserType, WorkspaceType } from "@app/types/user";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
+
+const PAST_CONVERSATIONS_LIMIT = 10;
 
 /**
  * Creates and holds the single conversation for the Analytics conversation
@@ -19,7 +24,8 @@ import { useCallback, useMemo, useState } from "react";
  * useCreateConversationWithMessage).
  *
  * Panel conversations are tagged with `analyticsPanel` in their metadata so
- * past ones can be listed and resumed from the panel's empty state.
+ * past ones can be listed and resumed from the panel's empty state, which the
+ * conversations list endpoint filters on server-side.
  */
 export function useAnalyticsConversation({
   owner,
@@ -38,17 +44,27 @@ export function useAnalyticsConversation({
     string | null
   >(null);
 
-  const { conversations, mutateConversations } = useConversations({
+  // Kept fetch-disabled: only used to prepend the new conversation to the
+  // sidebar list cache.
+  const { mutateConversations } = useConversations({
     workspaceId: owner.sId,
+    options: { disabled: true },
+  });
+
+  const {
+    conversations: pastConversations,
+    mutateConversations: mutatePastConversations,
+  } = useConversations({
+    workspaceId: owner.sId,
+    limit: PAST_CONVERSATIONS_LIMIT,
+    filter: "analyticsPanel",
     options: { disabled },
   });
 
-  const pastConversations = useMemo(
-    () => conversations.filter((c) => c.metadata?.analyticsPanel === true),
-    [conversations]
-  );
-
-  const { conversation: pickedConversation } = useConversation({
+  const {
+    conversation: pickedConversation,
+    isConversationLoading: isPickedConversationLoading,
+  } = useConversation({
     conversationId: pickedConversationId,
     workspaceId: owner.sId,
   });
@@ -92,20 +108,28 @@ export function useAnalyticsConversation({
 
       setConversation(result.value);
       setPickedConversationId(null);
-      await mutateConversations(
-        (currentData) => [result.value, ...(currentData ?? [])],
-        { revalidate: false }
-      );
+      const prependCreated = (
+        currentData: ConversationListItemType[] | undefined
+      ) => [result.value, ...(currentData ?? [])];
+      await Promise.all([
+        mutateConversations(prependCreated, { revalidate: false }),
+        mutatePastConversations(prependCreated, { revalidate: false }),
+      ]);
 
       return new Ok(undefined);
     },
-    [createConversationWithMessage, mutateConversations, sendNotification]
+    [
+      createConversationWithMessage,
+      mutateConversations,
+      mutatePastConversations,
+      sendNotification,
+    ]
   );
 
-  const pickConversation = useCallback((conversationId: string) => {
+  const pickConversation = (conversationId: string) => {
     setConversation(null);
     setPickedConversationId(conversationId);
-  }, []);
+  };
 
   const resetConversation = useCallback(() => {
     setConversation(null);
@@ -114,7 +138,11 @@ export function useAnalyticsConversation({
 
   return {
     conversation: conversation ?? pickedConversation ?? null,
-    isConversationLoading: pickedConversationId !== null && !pickedConversation,
+    // `useConversation` reports loading while its key is null, so the picked id
+    // has to gate it. On error it flips back to false and the panel falls back
+    // to the picker.
+    isConversationLoading:
+      pickedConversationId !== null && isPickedConversationLoading,
     pastConversations,
     createConversation,
     pickConversation,

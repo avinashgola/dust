@@ -11,6 +11,18 @@ import type {
 import type { ContentFragmentType } from "@app/types/content_fragment";
 import { z } from "zod";
 
+/**
+ * Allowlisted filters for the private conversation list. Kept as a closed set
+ * so clients cannot turn the endpoint into an arbitrary `metadata` query.
+ */
+export const GetConversationsQuerySchema = z.object({
+  filter: z.enum(["analyticsPanel"]).optional(),
+});
+
+export type ConversationListFilter = NonNullable<
+  z.infer<typeof GetConversationsQuerySchema>["filter"]
+>;
+
 export type GetConversationsResponseBody = {
   conversations: ConversationListItemType[];
   hasMore: boolean;

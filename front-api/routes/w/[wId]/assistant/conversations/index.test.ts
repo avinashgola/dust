@@ -16,11 +16,18 @@ vi.mock("@app/lib/api/assistant/conversation/content_fragment", () => ({
 }));
 
 import { getContentFragmentBlob } from "@app/lib/api/assistant/conversation/content_fragment";
+import {
+  ConversationModel,
+  ConversationParticipantModel,
+} from "@app/lib/models/agent/conversation";
 import { WorkspaceResource } from "@app/lib/resources/workspace_resource";
 import { AgentConfigurationFactory } from "@app/tests/utils/AgentConfigurationFactory";
+import { ConversationFactory } from "@app/tests/utils/ConversationFactory";
 import { DataSourceViewFactory } from "@app/tests/utils/DataSourceViewFactory";
 import { FeatureFlagFactory } from "@app/tests/utils/FeatureFlagFactory";
 import { createPrivateApiMockRequest } from "@app/tests/utils/generic_private_api_tests";
+import { GLOBAL_AGENTS_SID } from "@app/types/assistant/assistant";
+import type { ConversationMetadata } from "@app/types/assistant/conversation";
 import { Ok } from "@app/types/shared/result";
 import { honoApp } from "@front-api/app";
 
@@ -257,5 +264,77 @@ describe("POST /api/w/:wId/assistant/conversations", () => {
     );
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("GET /api/w/:wId/assistant/conversations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function createParticipatingConversation(
+    auth: Parameters<typeof ConversationFactory.create>[0],
+    userId: number,
+    metadata: ConversationMetadata
+  ) {
+    const conversation = await ConversationFactory.create(auth, {
+      agentConfigurationId: GLOBAL_AGENTS_SID.DUST,
+      messagesCreatedAt: [new Date()],
+    });
+    await ConversationModel.update(
+      { metadata },
+      { where: { id: conversation.id } }
+    );
+    await ConversationParticipantModel.create({
+      conversationId: conversation.id,
+      userId,
+      workspaceId: auth.getNonNullableWorkspace().id,
+      action: "posted",
+      actionRequired: false,
+    });
+
+    return conversation;
+  }
+
+  it("restricts the list to Analytics panel conversations when filtered", async () => {
+    const { workspace, auth, user } = await createPrivateApiMockRequest({
+      method: "GET",
+      role: "admin",
+    });
+
+    const analyticsConversation = await createParticipatingConversation(
+      auth,
+      user.id,
+      { analyticsPanel: true }
+    );
+    await createParticipatingConversation(auth, user.id, {});
+
+    const unfiltered = await honoApp.request(
+      `/api/w/${workspace.sId}/assistant/conversations`
+    );
+    expect(unfiltered.status).toBe(200);
+    expect((await unfiltered.json()).conversations).toHaveLength(2);
+
+    const filtered = await honoApp.request(
+      `/api/w/${workspace.sId}/assistant/conversations?filter=analyticsPanel`
+    );
+    expect(filtered.status).toBe(200);
+    const { conversations } = await filtered.json();
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0].sId).toBe(analyticsConversation.sId);
+  });
+
+  it("rejects a filter outside the allowlist", async () => {
+    const { workspace } = await createPrivateApiMockRequest({
+      method: "GET",
+      role: "admin",
+    });
+
+    const response = await honoApp.request(
+      `/api/w/${workspace.sId}/assistant/conversations?filter=urlAccessMode`
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.type).toBe("invalid_request_error");
   });
 });

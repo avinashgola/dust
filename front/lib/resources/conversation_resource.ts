@@ -31,6 +31,7 @@ import { UserResource } from "@app/lib/resources/user_resource";
 import { withTransaction } from "@app/lib/utils/sql_utils";
 import { getNextWakeUpFireAtFromScheduleConfig } from "@app/lib/utils/wakeup_description";
 import logger from "@app/logger/logger";
+import type { ConversationListFilter } from "@app/types/api/assistant/conversation/types";
 import type { LightAgentConfigurationType } from "@app/types/assistant/agent";
 import type {
   AgentMessageStatus,
@@ -184,6 +185,20 @@ const shouldByPassPrivateByDefaultUrlRestriction = (auth: Authenticator) => {
       return false;
     default:
       assertNever(authMethod);
+  }
+};
+
+const whereClauseForConversationListFilter = (
+  filter: ConversationListFilter | undefined
+): WhereOptions<InferAttributes<ConversationModel>> | undefined => {
+  if (!filter) {
+    return undefined;
+  }
+  switch (filter) {
+    case "analyticsPanel":
+      return { metadata: { analyticsPanel: true } };
+    default:
+      assertNever(filter);
   }
 };
 
@@ -2259,7 +2274,8 @@ export class ConversationResource extends BaseResource<ConversationModel> {
       limit: number;
       lastValue?: string;
       orderDirection?: "asc" | "desc";
-    }
+    },
+    filter?: ConversationListFilter
   ): Promise<{
     conversations: ConversationListItemType[];
     hasMore: boolean;
@@ -2267,6 +2283,7 @@ export class ConversationResource extends BaseResource<ConversationModel> {
   }> {
     const result = await this.fetchPrivateConversationsPaginated(auth, {
       pagination,
+      extraWhereClause: whereClauseForConversationListFilter(filter),
     });
     await this.enrichWithNextWakeupAt(auth, result.conversations);
 

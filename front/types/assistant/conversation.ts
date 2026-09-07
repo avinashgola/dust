@@ -530,6 +530,8 @@ export type ConversationMetadata = Record<string, unknown> & {
   useFileSystem?: boolean;
   /** Selects the database-backed filesystem for a fresh standalone conversation. */
   useDatabaseFileSystem?: boolean;
+  /** Marks a conversation started from the Analytics page side panel. */
+  analyticsPanel?: boolean;
 };
 
 function isConversationUrlAccessMode(

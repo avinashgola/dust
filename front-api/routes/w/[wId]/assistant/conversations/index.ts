@@ -23,6 +23,7 @@ import type {
   GetConversationsResponseBody,
   PostConversationsResponseBody,
 } from "@app/types/api/assistant/conversation/types";
+import { GetConversationsQuerySchema } from "@app/types/api/assistant/conversation/types";
 import type {
   ConversationType,
   UserMessageType,
@@ -82,6 +83,13 @@ const app = workspaceApp();
  *         description: ID of the workspace
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: filter
+ *         required: false
+ *         description: Restrict the list to a specific kind of conversation.
+ *         schema:
+ *           type: string
+ *           enum: [analyticsPanel]
  *     security:
  *       - BearerAuth: []
  *     responses:
@@ -202,43 +210,52 @@ const app = workspaceApp();
  *         description: Unauthorized
  */
 
-app.get("/", async (ctx): HandlerResult<GetConversationsResponseBody> => {
-  const auth = ctx.get("auth");
+app.get(
+  "/",
+  validate("query", GetConversationsQuerySchema),
+  async (ctx): HandlerResult<GetConversationsResponseBody> => {
+    const auth = ctx.get("auth");
+    const { filter } = ctx.req.valid("query");
 
-  // getPaginationParams expects a Next-style query object; flatten Hono's
-  // query map (single-valued strings are fine here).
-  const paginationRes = getPaginationParams(ctx.req.query(), {
-    defaultLimit: 100,
-    defaultOrderColumn: "updatedAt",
-    defaultOrderDirection: "desc",
-    supportedOrderColumn: ["updatedAt"],
-  });
+    // getPaginationParams expects a Next-style query object; flatten Hono's
+    // query map (single-valued strings are fine here).
+    const paginationRes = getPaginationParams(ctx.req.query(), {
+      defaultLimit: 100,
+      defaultOrderColumn: "updatedAt",
+      defaultOrderDirection: "desc",
+      supportedOrderColumn: ["updatedAt"],
+    });
 
-  if (paginationRes.isErr()) {
-    return apiError(ctx, {
-      status_code: 400,
-      api_error: {
-        type: "invalid_request_error",
-        message: paginationRes.error.reason,
-      },
+    if (paginationRes.isErr()) {
+      return apiError(ctx, {
+        status_code: 400,
+        api_error: {
+          type: "invalid_request_error",
+          message: paginationRes.error.reason,
+        },
+      });
+    }
+
+    const pagination = paginationRes.value;
+
+    const result =
+      await ConversationResource.listPrivateConversationsForUserPaginated(
+        auth,
+        {
+          limit: pagination.limit,
+          lastValue: pagination.lastValue,
+          orderDirection: pagination.orderDirection,
+        },
+        filter
+      );
+
+    return ctx.json({
+      conversations: result.conversations,
+      hasMore: result.hasMore,
+      lastValue: result.lastValue,
     });
   }
-
-  const pagination = paginationRes.value;
-
-  const result =
-    await ConversationResource.listPrivateConversationsForUserPaginated(auth, {
-      limit: pagination.limit,
-      lastValue: pagination.lastValue,
-      orderDirection: pagination.orderDirection,
-    });
-
-  return ctx.json({
-    conversations: result.conversations,
-    hasMore: result.hasMore,
-    lastValue: result.lastValue,
-  });
-});
+);
 
 app.post(
   "/",

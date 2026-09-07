@@ -3,7 +3,10 @@ import {
   useFetcher,
   useSWRInfiniteWithDefaults,
 } from "@app/lib/swr/swr";
-import type { GetConversationsResponseBody } from "@app/types/api/assistant/conversation/types";
+import type {
+  ConversationListFilter,
+  GetConversationsResponseBody,
+} from "@app/types/api/assistant/conversation/types";
 import type { ConversationListItemType } from "@app/types/assistant/conversation";
 import { useCallback, useMemo } from "react";
 import type { Fetcher } from "swr";
@@ -23,10 +26,14 @@ type MutateOptions = {
 export function useConversations({
   workspaceId,
   limit = DEFAULT_LIMIT,
+  filter,
   options,
 }: {
   workspaceId: string;
   limit?: number;
+  // Restricts the list server-side, before pagination, so a filtered list is
+  // not just the first page of all conversations narrowed down client-side.
+  filter?: ConversationListFilter;
   options?: { disabled?: boolean };
 }) {
   const { fetcher } = useFetcher();
@@ -42,7 +49,9 @@ export function useConversations({
           return null;
         }
 
-        const baseUrl = `/api/w/${workspaceId}/assistant/conversations?limit=${limit}`;
+        const baseUrl =
+          `/api/w/${workspaceId}/assistant/conversations?limit=${limit}` +
+          (filter ? `&filter=${filter}` : "");
 
         if (previousPageData === null) {
           return baseUrl;

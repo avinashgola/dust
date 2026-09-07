@@ -30,14 +30,11 @@ import {
   ConversationMessageContent,
   ConversationMessageTitle,
   ConversationPicker,
+  Icon,
   Robot,
   Spinner,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   XClose,
 } from "@dust-tt/sparkle";
-
 import { useMemo } from "react";
 
 interface AnalyticsConversationPanelHeaderProps {
@@ -51,20 +48,19 @@ function AnalyticsConversationPanelHeader({
 }: AnalyticsConversationPanelHeaderProps) {
   return (
     <div className="flex h-14 w-full items-center justify-between px-2">
-      {onBack && (
-        <Button
-          icon={ArrowLeft}
-          size="sm"
-          variant="ghost-secondary"
-          tooltip="Back to conversations"
-          onClick={onBack}
-        />
-      )}
-      <Tabs value="analyst">
-        <TabsList>
-          <TabsTrigger value="analyst" label="Analyst" icon={Robot} />
-        </TabsList>
-      </Tabs>
+      <div className="flex min-w-0 items-center gap-1.5 px-2">
+        {onBack && (
+          <Button
+            icon={ArrowLeft}
+            size="sm"
+            variant="ghost-secondary"
+            tooltip="Back to conversations"
+            onClick={onBack}
+          />
+        )}
+        <Icon visual={Robot} size="sm" className="shrink-0" />
+        <span className="line-clamp-1 text-sm font-medium">Analyst</span>
+      </div>
       <Button
         icon={XClose}
         size="sm"
@@ -241,7 +237,10 @@ export interface AnalyticsConversationPanelProps {
   owner: WorkspaceType;
   user: UserType;
   onClose: () => void;
-  /** Skips fetching the agent configuration while the panel is closed. */
+  /**
+   * Skips fetching the agent configuration and the past panel conversations
+   * while the panel is closed.
+   */
   disabled?: boolean;
 }
 
@@ -269,7 +268,11 @@ export function AnalyticsConversationPanel({
       <div className="sticky top-0 z-10 flex items-center border-b border-border bg-panel-background/80 backdrop-blur-sm">
         <AnalyticsConversationPanelHeader
           onClose={onClose}
-          onBack={conversation ? resetConversation : undefined}
+          onBack={
+            conversation || isConversationLoading
+              ? resetConversation
+              : undefined
+          }
         />
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
