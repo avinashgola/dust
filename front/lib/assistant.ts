@@ -27,7 +27,16 @@ function checkModelSpecificAccessRules(
     plan: PlanType | null;
   }
 ): boolean {
-  const { availableIfOneOf, largeModel } = modelConfiguration;
+  const { availableIfOneOf, largeModel, unavailableIfFeatureFlag } =
+    modelConfiguration;
+
+  // Opt-out check: the model's own kill flag vetoes every grant below.
+  if (
+    unavailableIfFeatureFlag !== undefined &&
+    featureFlags.includes(unavailableIfFeatureFlag)
+  ) {
+    return false;
+  }
 
   // First check: downgraded plans only have access to the small models.
   if (largeModel && !isUpgraded(plan)) {
@@ -61,6 +70,12 @@ function checkModelSpecificAccessRules(
   return true;
 }
 
+/**
+ * @cc [label:product] unavailable-feature-flag-vetoes-availability
+ * A model declaring `unavailableIfFeatureFlag` must be reported unavailable whenever
+ * `featureFlags` contains that flag, whatever `availableIfOneOf`, `plan`, `region` or
+ * `regionalModelsOnly` would otherwise grant.
+ */
 // Returns true if the model is available to the workspace for build.
 export function isModelAvailable(
   m: ModelConfigurationType,

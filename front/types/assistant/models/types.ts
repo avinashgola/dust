@@ -136,6 +136,10 @@ export const ModelConfigurationSchema = z.object({
   // Specify if the model is available in specific regions.
   regionalAvailability: z.record(z.enum(SUPPORTED_REGIONS), z.boolean()),
   availableIfOneOf: AvailabilityConditionSchema.optional(),
+  // If set, the model is unavailable to workspaces that have this feature flag
+  // enabled, whatever `availableIfOneOf` grants. Opt-out switch used to pull a
+  // model back from a workspace without touching its availability conditions.
+  unavailableIfFeatureFlag: WhitelistableFeatureSchema.optional(),
   customAvailableIf: CustomAvailabilityConditionSchema.optional(),
 });
 
