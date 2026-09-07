@@ -62,6 +62,7 @@ vi.mock(
     useConversationSidePanelContext: () => ({
       currentPanel: undefined,
       isPanelClosing: false,
+      canGoBack: false,
       openPanel: vi.fn(),
       togglePanel: togglePanelMock,
       closePanel: vi.fn(),

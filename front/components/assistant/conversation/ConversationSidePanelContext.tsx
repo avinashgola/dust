@@ -33,6 +33,8 @@ interface ConversationSidePanelContextType {
   // old value meanwhile so the panel content does not flicker; toggles read this to unselect
   // right away.
   isPanelClosing: boolean;
+  // True when closing the current panel shows a previous one instead of collapsing.
+  canGoBack: boolean;
   openPanel: (params: OpenPanelParams) => void;
   togglePanel: (params: OpenPanelParams) => void;
   // Goes back to the panel shown before the current one when it was never closed itself,
@@ -107,7 +109,13 @@ export function ConversationSidePanelProvider({
   // Panels shown before the current one and not closed since, most recent last. Closing pops
   // from here; opening a different panel pushes the current one.
   const panelHistoryRef = React.useRef<OpenPanelParams[]>([]);
+  // Mirror of the history length so consumers re-render when it changes.
+  const [historyLength, setHistoryLength] = React.useState(0);
   const currentParamsRef = React.useRef<OpenPanelParams | null>(null);
+  const setHistory = useCallback((history: OpenPanelParams[]) => {
+    panelHistoryRef.current = history;
+    setHistoryLength(history.length);
+  }, []);
 
   // This should be called once the closing animation is done (onTransitionEnd)
   // so you won't have content flickering
@@ -150,13 +158,15 @@ export function ConversationSidePanelProvider({
   );
 
   const closePanel = useCallback(() => {
-    const previous = panelHistoryRef.current.pop();
+    const history = panelHistoryRef.current;
+    const previous = history[history.length - 1];
     if (previous) {
+      setHistory(history.slice(0, -1));
       showPanel(previous);
       return;
     }
     collapsePanel();
-  }, [showPanel, collapsePanel]);
+  }, [showPanel, collapsePanel, setHistory]);
 
   // Shared selection; `toggle` decides whether re-selecting the shown panel closes it. A panel
   // that is already closing reads as unselected, so re-selecting it reopens instead.
@@ -178,13 +188,13 @@ export function ConversationSidePanelProvider({
       }
 
       if (current) {
-        panelHistoryRef.current = [...panelHistoryRef.current, current].slice(
-          -MAX_PANEL_HISTORY
+        setHistory(
+          [...panelHistoryRef.current, current].slice(-MAX_PANEL_HISTORY)
         );
       }
       showPanel(params);
     },
-    [isPanelClosing, closePanel, showPanel]
+    [isPanelClosing, closePanel, showPanel, setHistory]
   );
 
   // Idempotent open for programmatic callers: a toggle could mis-close during a close→reopen
@@ -214,10 +224,10 @@ export function ConversationSidePanelProvider({
     ) {
       // Exit full screen too, mirroring FrameRenderer's close button.
       setFullScreenHash(undefined);
-      panelHistoryRef.current = [];
+      setHistory([]);
       collapsePanel();
     }
-  }, [activeConversationId, collapsePanel, setFullScreenHash]);
+  }, [activeConversationId, collapsePanel, setFullScreenHash, setHistory]);
 
   // Initialize panel state from URL hash parameters
   useEffect(() => {
@@ -239,6 +249,7 @@ export function ConversationSidePanelProvider({
         ? currentPanel
         : undefined,
       isPanelClosing,
+      canGoBack: historyLength > 0,
       openPanel,
       togglePanel,
       closePanel,
@@ -252,6 +263,7 @@ export function ConversationSidePanelProvider({
     [
       currentPanel,
       isPanelClosing,
+      historyLength,
       openPanel,
       togglePanel,
       closePanel,
