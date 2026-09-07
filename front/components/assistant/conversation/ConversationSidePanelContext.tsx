@@ -108,9 +108,9 @@ export function ConversationSidePanelProvider({
   );
 
   // Panels shown before the current one and not closed since, most recent last. Closing pops
-  // from here; opening a different panel pushes the current one.
+  // from here; opening a different panel pushes the current one. The ref is the source of truth
+  // (closePanel reads it synchronously); the length state only exists to re-render `canGoBack`.
   const panelHistoryRef = React.useRef<OpenPanelParams[]>([]);
-  // Mirror of the history length so consumers re-render when it changes.
   const [historyLength, setHistoryLength] = React.useState(0);
   const currentParamsRef = React.useRef<OpenPanelParams | null>(null);
   const setHistory = useCallback((history: OpenPanelParams[]) => {

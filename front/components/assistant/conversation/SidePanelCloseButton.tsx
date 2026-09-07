@@ -2,7 +2,8 @@ import { useConversationSidePanelContext } from "@app/components/assistant/conve
 import { ArrowLeft, Button, XClose } from "@dust-tt/sparkle";
 
 interface SidePanelCloseButtonProps {
-  // Defaults to closePanel; pass a handler to run extra cleanup before closing.
+  // Defaults to closePanel. A custom handler must end with closePanel(): the icon promises a
+  // close or a back navigation, whichever the history dictates.
   onClick?: () => void;
   className?: string;
 }
